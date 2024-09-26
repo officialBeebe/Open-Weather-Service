@@ -1,11 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
-    <RootNamespace>Open_Weather_Service</RootNamespace>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+	<PackageId>OpenWeatherService</PackageId>
+    <OutputType>Exe</OutputType>    <!-- Defines this as an executable -->
+    <TargetFramework>net8.0</TargetFramework>    <!-- Target framework -->
+    <RootNamespace>OpenWeatherService</RootNamespace>    <!-- Root namespace -->
+    <ImplicitUsings>enable</ImplicitUsings>    <!-- Enable implicit usings -->
+    <Nullable>enable</Nullable>    <!-- Enable nullable references -->
+    <PackAsTool>true</PackAsTool>    <!-- Enable packing as a tool -->
+    <ToolCommandName>ow</ToolCommandName>    <!-- Command to run the tool -->
+    <Version>1.0.0</Version>    <!-- Version of the tool -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,13 +17,14 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.2" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="System.Globalization" Version="4.3.0" />
   </ItemGroup>
 
-	<ItemGroup>
-		<None Update="appsettings.json">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-	</ItemGroup>
+  <ItemGroup>
+    <None Update="appsettings.json">
+		<Pack>true</Pack>
+		<PackagePath>contentFiles\any\any\</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>      <!-- Ensures the appsettings.json is copied to the output directory -->
+    </None>
+  </ItemGroup>
 
 </Project>
