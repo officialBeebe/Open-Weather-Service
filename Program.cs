@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿using System.IO;
+using Newtonsoft.Json;
+using System.Reflection;
 using System.Globalization;
 using OpenWeatherService.Models;
 using Microsoft.Extensions.Configuration;
@@ -11,78 +13,119 @@ namespace OpenWeatherService
 
         static async Task Main(string[] args)
         {
-            // Load configuration
-            config = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .Build();
-
-            // Bind config to OpenWeatherServiceConfig
-            var openWeatherServiceConfig = config.GetSection("OpenWeatherService").Get<OpenWeatherSettings>();
-            string openWeatherApiKey = openWeatherServiceConfig.OpenWeatherApiKey;
-            string latitude = openWeatherServiceConfig.Latitude;
-            string longitude = openWeatherServiceConfig.Longitude;
-
-            // Argument to update latitude and longitude
-            if (args.Length > 0 && args[0] == "--update-lat-long")
             {
-                if (args.Length == 3)
+                // Load configuration
+                config = LoadEmbeddedConfig();
+
+                // Bind config to OpenWeatherServiceConfig
+                var openWeatherServiceConfig = config.GetSection("OpenWeatherService").Get<OpenWeatherSettings>();
+                string openWeatherApiKey = openWeatherServiceConfig.OpenWeatherApiKey;
+                string latitude = openWeatherServiceConfig.Latitude;
+                string longitude = openWeatherServiceConfig.Longitude;
+
+                // Argument to update latitude and longitude
+                if (args.Length > 0 && args[0] == "--location")
                 {
-                    UpdateConfigLatLong(args[1], args[2]);
-                    Console.WriteLine($"Updated appsettings.json with Latitude: {args[1]}, Longitude: {args[2]}");
-                    return;
+                    if (args.Length == 3)
+                    {
+                        UpdateConfigLatLong(args[1], args[2]);
+                        Console.WriteLine($"Updated config with Latitude: {args[1]}, Longitude: {args[2]}");
+                        return;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Usage: --location <latitude> <longitude>");
+                        return;
+                    }
                 }
-                else
-                {
-                    Console.WriteLine("Usage: --update-lat-long <latitude> <longitude>");
-                    return;
-                }
-            }
 
-            // Argument to use config latitude and longitude
-            if (args.Length > 0 && args[0] == "--config")
-            {
-                Console.WriteLine("Using Latitude and Longitude from appsettings.json");
-            }
-            else
-            {
-                // Get latitude and longitude from IP or generate random
-                var locationFromIP = await GetLocationFromIP();
-                if (locationFromIP == null)
+                // Argument to update API key
+                if (args.Length > 0 && args[0] == "--key")
                 {
-                    Console.WriteLine("Failed to get location from IP; using random...");
+                    if (args.Length == 3)
+                    {
+                        UpdateApiKey(args[1], args[2]);
+                        Console.WriteLine($"Updated config with {args[1]} API key");
+                        return;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Usage: --key <OpenWeather|IPInfo> <key>");
+                        return;
+                    }
+                }
+
+                // Determine location to use (user config, IP-based, or random)
+                if (args.Length > 0 && args[0] == "--random")
+                {
+                    // Use random latitude and longitude
                     var randomLocation = GetRandomLocation();
                     latitude = randomLocation.latitude.ToString();
                     longitude = randomLocation.longitude.ToString();
+                    Console.WriteLine($"Using random Latitude: {latitude}, Longitude: {longitude}");
+                }
+                else if (args.Length > 0 && args[0] == "--user")
+                {
+                    // Use user-configured latitude and longitude
+                    Console.WriteLine("Using user configured Latitude and Longitude...");
                 }
                 else
                 {
-                    latitude = locationFromIP.Value.latitude.ToString();
-                    longitude = locationFromIP.Value.longitude.ToString();
+                    // Attempt to get location from IP
+                    var locationFromIP = await GetLocationFromIP();
+                    if (locationFromIP != null)
+                    {
+                        latitude = locationFromIP.Value.latitude.ToString();
+                        longitude = locationFromIP.Value.longitude.ToString();
+                    }
+                    else
+                    {
+                        // Fallback to random location if IP location fails
+                        Console.WriteLine("Failed to get location from IP; using random...");
+                        var randomLocation = GetRandomLocation();
+                        latitude = randomLocation.latitude.ToString();
+                        longitude = randomLocation.longitude.ToString();
+                    }
                 }
-            }
 
-            if (args.Length > 0 && args[0] == "--random")
+                // Validate configuration
+                if (string.IsNullOrEmpty(latitude) || string.IsNullOrEmpty(longitude) || string.IsNullOrEmpty(openWeatherApiKey))
+                {
+                    Console.WriteLine("Invalid configuration");
+                    return;
+                }
+
+                // Fetch weather data using HttpClient
+                await FetchWeatherData(openWeatherApiKey, latitude, longitude);
+            }
+        }
+
+            // Load appsettings.json from embedded resource
+        private static IConfiguration LoadEmbeddedConfig()
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            using (var stream = assembly.GetManifestResourceStream("OpenWeatherService.appsettings.json"))
             {
-                var randomLocation = GetRandomLocation();
-                latitude = randomLocation.latitude.ToString();
-                longitude = randomLocation.longitude.ToString();
-                Console.WriteLine($"Using random Latitude: {latitude}, Longitude: {longitude}");
-            }
+                if (stream == null)
+                {
+                    throw new FileNotFoundException("The configuration file 'appsettings.json' was not found as an embedded resource.");
+                }
 
-            // Validate configuration
-            if (string.IsNullOrEmpty(latitude) || string.IsNullOrEmpty(longitude) || string.IsNullOrEmpty(openWeatherApiKey))
-            {
-                Console.WriteLine("Invalid configuration");
-                return;
+                var builder = new ConfigurationBuilder()
+                    .AddJsonStream(stream);
+                return builder.Build();
             }
-
-            // Fetch weather data using HttpClient
-            await FetchWeatherData(openWeatherApiKey, latitude, longitude);
         }
 
         public static async Task FetchWeatherData(string apiKey, string latitude, string longitude)
         {
+            if (string.IsNullOrEmpty(apiKey))
+            {
+
+                Console.WriteLine("Invalid API key. Try updating with: ow --key <api> <key>");
+                return;
+            }
+
             using (HttpClient client = new HttpClient())
             {
                 try
@@ -125,15 +168,64 @@ namespace OpenWeatherService
             }
         }
 
-        public static void UpdateConfigLatLong(string latitude, string longitude)
+        private static void UpdateConfigLatLong(string latitude, string longitude)
         {
+            UpdateConfigField("Latitude", latitude);
+            UpdateConfigField("Longitude", longitude);
+        }
+
+        private static bool ValidateApiKey(string target)
+        {
+
+            switch (target)
+            {
+                case "OpenWeather":
+                    {
+                        var openWeatherServiceConfig = config.GetSection("OpenWeatherService").Get<OpenWeatherSettings>();
+                        string openWeatherApiKey = openWeatherServiceConfig.OpenWeatherApiKey;
+                        return !string.IsNullOrEmpty(openWeatherApiKey);
+                    }
+                case "IPInfo":
+                    {
+                        var openWeatherServiceConfig = config.GetSection("OpenWeatherService").Get<OpenWeatherSettings>();
+                        string iPInfoApiKey = openWeatherServiceConfig.IPInfoApiKey;
+                        return !string.IsNullOrEmpty(iPInfoApiKey);
+                    }
+                default:
+                    {
+                        Console.WriteLine("Invalid target. Use 'OpenWeather' or 'IPInfo'");
+                        return false;
+                    }
+            }
+
+        }
+
+        private static void UpdateApiKey(string target, string key)
+        {
+            switch (target)
+            {
+                case "OpenWeather":
+                    UpdateConfigField("OpenWeatherApiKey", key);
+                    break;
+                case "IPInfo":
+                    UpdateConfigField("IPInfoApiKey", key);
+                    break;
+                default:
+                    Console.WriteLine("Invalid target. Use 'OpenWeather' or 'IPInfo'");
+                    break;
+            }
+
+        }
+
+        private static void UpdateConfigField(string field, string value)
+        {
+
             var jsonFile = "appsettings.json";
             var json = File.ReadAllText(jsonFile);
             dynamic jsonObj = JsonConvert.DeserializeObject(json);
 
-            // Update Latitude and Longitude in the config file
-            jsonObj["OpenWeatherService"]["Latitude"] = latitude;
-            jsonObj["OpenWeatherService"]["Longitude"] = longitude;
+            // Update a single OpenWeatherService field from appsettings.json
+            jsonObj["OpenWeatherService"][field] = value;
 
             string output = JsonConvert.SerializeObject(jsonObj, Formatting.Indented);
             File.WriteAllText(jsonFile, output);

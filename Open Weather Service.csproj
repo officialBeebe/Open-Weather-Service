@@ -19,12 +19,9 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="appsettings.json">
-		<Pack>true</Pack>
-		<PackagePath>contentFiles\any\any\</PackagePath>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>      <!-- Ensures the appsettings.json is copied to the output directory -->
-    </None>
-  </ItemGroup>
+	<ItemGroup>
+		<EmbeddedResource Include="appsettings.json" />
+	</ItemGroup>
+
 
 </Project>
