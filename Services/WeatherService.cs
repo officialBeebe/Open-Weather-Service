@@ -11,11 +11,13 @@ namespace OpenWeatherService.Services
     {
         private readonly string _openWeatherApiKey;
         private readonly string _iPInfoApiKey;
+        private readonly HttpClient _httpClient;
 
-        public WeatherService(string openWeatherApiKey, string iPInfoApiKey)
+        public WeatherService(string openWeatherApiKey, string iPInfoApiKey, HttpClient httpClient)
         {
             _openWeatherApiKey = openWeatherApiKey;
             _iPInfoApiKey = iPInfoApiKey;
+            _httpClient = httpClient;
         }
 
         public async Task<WeatherInfo> FetchWeatherData(string latitude, string longitude)
@@ -26,42 +28,40 @@ namespace OpenWeatherService.Services
                 return null;
             }
 
-            using (HttpClient client = new HttpClient())
+            string requestUrl = $"https://api.openweathermap.org/data/2.5/weather?lat={latitude}&lon={longitude}&appid={_openWeatherApiKey}&units=metric";
+
+            try
             {
-                string requestUrl = $"https://api.openweathermap.org/data/2.5/weather?lat={latitude}&lon={longitude}&appid={_openWeatherApiKey}&units=metric";
+                HttpResponseMessage response = await _httpClient.GetAsync(requestUrl);
+                response.EnsureSuccessStatusCode();
 
-                try
+                string responseBody = await response.Content.ReadAsStringAsync();
+                dynamic weatherData = JsonConvert.DeserializeObject(responseBody);
+
+                string locationName = weatherData.name ?? "Unknown location";
+                string weatherDescription = weatherData.weather[0].description;
+
+                WeatherInfo weatherInfo = new WeatherInfo
                 {
-                    HttpResponseMessage response = await client.GetAsync(requestUrl);
-                    response.EnsureSuccessStatusCode();
+                    LocationName = locationName,
+                    WeatherDescription = weatherDescription,
+                    Celsius = (float)weatherData.main.temp,
+                    Fahrenheit = (float)Math.Round((float)(weatherData.main.temp * 9 / 5) + 32),
+                    SunriseMoment = DateTimeOffset.FromUnixTimeSeconds((long)weatherData.sys.sunrise).ToLocalTime().DateTime,
+                    SunsetMoment = DateTimeOffset.FromUnixTimeSeconds((long)weatherData.sys.sunset).ToLocalTime().DateTime,
+                    Latitude = Convert.ToDouble(latitude),
+                    Longitude = Convert.ToDouble(longitude)
+                };
 
-                    string responseBody = await response.Content.ReadAsStringAsync();
-                    dynamic weatherData = JsonConvert.DeserializeObject(responseBody);
-
-                    string locationName = weatherData.name ?? "Unknown location";
-                    string weatherDescription = weatherData.weather[0].description;
-
-                    WeatherInfo weatherInfo = new WeatherInfo
-                    {
-                        LocationName = locationName,
-                        WeatherDescription = weatherDescription,
-                        Celsius = (float)weatherData.main.temp,
-                        Fahrenheit = (float)Math.Round((float)(weatherData.main.temp * 9 / 5) + 32),
-                        SunriseMoment = DateTimeOffset.FromUnixTimeSeconds((long)weatherData.sys.sunrise).ToLocalTime().DateTime,
-                        SunsetMoment = DateTimeOffset.FromUnixTimeSeconds((long)weatherData.sys.sunset).ToLocalTime().DateTime,
-                        Latitude = Convert.ToDouble(latitude),
-                        Longitude = Convert.ToDouble(longitude)
-                    };
-
-                    return weatherInfo;
-                }
-                catch (HttpRequestException e)
-                {
-                    Console.WriteLine($"Error fetching weather data: {e.Message}");
-                    return null;
-                }
+                return weatherInfo;
+            }
+            catch (HttpRequestException e)
+            {
+                Console.WriteLine($"Error fetching weather data: {e.Message}");
+                return null;
             }
         }
+        
 
         public async Task<(double latitude, double longitude)?> GetLocationFromIP()
         {

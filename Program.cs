@@ -10,25 +10,29 @@ namespace OpenWeatherService
     {
         static async Task Main(string[] args)
         {
-            // Load API keys from App.config
-            string openWeatherApiKey = ConfigurationManager.AppSettings["OpenWeather:ApiKey"];
-            string iPInfoApiKey = ConfigurationManager.AppSettings["IPInfo:ApiKey"];
-
-            // Validate API keys
-            if (string.IsNullOrEmpty(openWeatherApiKey) || string.IsNullOrEmpty(iPInfoApiKey))
+            using (HttpClient httpClient = new HttpClient())
             {
-                Console.WriteLine("Error: API keys not detected in App.config.");
-                return;
+                // Load API keys from App.config
+                string openWeatherApiKey = ConfigurationManager.AppSettings["OpenWeather:ApiKey"];
+                string iPInfoApiKey = ConfigurationManager.AppSettings["IPInfo:ApiKey"];
+
+                // Validate API keys
+                if (string.IsNullOrEmpty(openWeatherApiKey) || string.IsNullOrEmpty(iPInfoApiKey))
+                {
+                    Console.WriteLine("Error: API keys not detected in App.config.");
+                    return;
+                }
+
+                // Instantiate the core weather service with the API keys
+                IWeatherService weatherService = new WeatherService(openWeatherApiKey, iPInfoApiKey, httpClient);
+
+                // Instantiate the CLI service and pass the weather service
+                CLIService cliService = new CLIService(weatherService);
+
+                // Handle command-line arguments and trigger the core logic
+                await cliService.HandleArguments(args);
             }
-
-            // Instantiate the core weather service with the API keys
-            IWeatherService weatherService = new WeatherService(openWeatherApiKey, iPInfoApiKey);
-
-            // Instantiate the CLI service and pass the weather service
-            CLIService cliService = new CLIService(weatherService);
-
-            // Handle command-line arguments and trigger the core logic
-            await cliService.HandleArguments(args);
+            
         }
     }
 }
