@@ -22,11 +22,5 @@
     <PackageReference Include="System.IO.Abstractions" Version="21.0.29" />
   </ItemGroup>
 
-	<ItemGroup>
-		<None Include="appsettings.dev.json">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-	</ItemGroup>
-
 
 </Project>
