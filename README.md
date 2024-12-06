@@ -2,20 +2,22 @@
 
 ## Build
 
-dotnet build -c Release; dotnet pack -c Release
+```dotnet build -c Release; dotnet pack -c Release```
 
 
 ## Install
 
-dotnet tool uninstall --global OpenWeatherService; dotnet tool install --global --add-source ./ OpenWeatherService
+Navigate to the /bin/release directory.
+
+```dotnet tool uninstall --global OpenWeatherService; dotnet tool install --global --add-source ./ OpenWeatherService```
 
 
 ## Verify Install
 
-dotnet tool list -g
+```dotnet tool list -g```
 
 
 ## Run
 
-ow *args*
+```ow```
 
